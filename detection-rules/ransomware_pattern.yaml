@@ -1,0 +1,10 @@
+rule: ransomware_pattern
+source: hospital.api.events + zeek.network
+condition: file_access_count > 100 WITHIN 10s AND outbound_bytes > baseline * 3
+severity: CRITICAL
+loki_label: ransomware
+push_metric: hospital_siem_alert_total{rule="ransomware"}
+grafana_alert: true
+telegram: true
+email: true
+mitre: T1486

@@ -1,0 +1,10 @@
+rule: lateral_movement
+source: hospital.auth.events + hospital.patient.access + hospital.network
+condition: same source_ip touches >= 4 distinct services WITHIN 120s
+severity: HIGH
+loki_label: lateral_movement
+push_metric: hospital_siem_alert_total{rule="lateral_movement"}
+grafana_alert: true
+telegram: true
+email: false
+mitre: T1021

@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: iot-gateway
+    static_configs:
+      - targets: ["iot-simulator:9090"]
+        labels:
+          hospital: CHU-Rabat
+
+  - job_name: siem-backend
+    static_configs:
+      - targets: ["siem-backend:9101"]
+        labels:
+          hospital: CHU-Rabat
+      - targets: ["siem-backend:9102"]
+        labels:
+          hospital: CHU-Rabat
+          component: faust-rule-engine
+
+remote_write:
+  - url: http://mimir:9009/api/v1/push

@@ -1,0 +1,80 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "datasource": {"type": "loki", "uid": "loki"},
+        "enable": true,
+        "expr": "{job=\"iot-gateway\"} |= \"IoT_ANOMALY\"",
+        "iconColor": "red",
+        "name": "IoT anomaly events",
+        "tagKeys": "device_id,severity",
+        "textFormat": "{{device_id}} {{severity}}",
+        "titleFormat": "IoT anomaly"
+      }
+    ]
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never"}, "unit": "bpm"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "mimir"}, "expr": "hospital_iot_heart_rate_bpm{device_type=\"ECG\"}", "legendFormat": "{{device_id}}", "refId": "A"}],
+      "title": "ECG heart rate per device",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "fieldConfig": {"defaults": {"max": 100, "min": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "orange", "value": 90}, {"color": "green", "value": 95}]}, "unit": "percent"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+      "id": 2,
+      "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showThresholdLabels": false, "showThresholdMarkers": true},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "mimir"}, "expr": "hospital_iot_spo2_percent{device_type=\"ECG\"}", "legendFormat": "{{device_id}}", "refId": "A"}],
+      "title": "SpO2 level per device",
+      "type": "gauge"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "lineWidth": 2, "showPoints": "never"}, "unit": "mlh"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
+      "id": 3,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "mimir"}, "expr": "hospital_iot_flow_rate_mlh{device_type=\"PUMP\"}", "legendFormat": "{{device_id}}", "refId": "A"}],
+      "title": "Infusion pump flow rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 8, "x": 0, "y": 8},
+      "id": 4,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "mimir"}, "expr": "count(hospital_iot_anomaly_score > 0.7)", "refId": "A"}],
+      "title": "Anomalous devices count",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "lineWidth": 2, "showPoints": "never"}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 16, "x": 8, "y": 8},
+      "id": 5,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "mimir"}, "expr": "hospital_iot_anomaly_score", "legendFormat": "{{device_id}}", "refId": "A"}],
+      "title": "IoT anomaly score timeline",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["hospital", "iot", "mimir"],
+  "templating": {"list": []},
+  "time": {"from": "now-3h", "to": "now"},
+  "timezone": "browser",
+  "title": "IoT Medical Devices Monitor",
+  "uid": "iot-medical-devices-monitor",
+  "version": 1
+}

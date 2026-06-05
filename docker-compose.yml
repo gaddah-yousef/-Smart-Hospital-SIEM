@@ -1,0 +1,327 @@
+name: smart-hospital-siem-grafana
+
+services:
+  grafana:
+    image: grafana/grafana:latest
+    container_name: hospital-grafana
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SMTP_ENABLED: "true"
+      GF_SMTP_HOST: ${SMTP_HOST}:${SMTP_PORT}
+      GF_SMTP_USER: ${SMTP_USER}
+      GF_SMTP_PASSWORD: ${SMTP_PASSWORD}
+      GF_SMTP_FROM_ADDRESS: ${SMTP_FROM}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      loki:
+        condition: service_started
+      mimir:
+        condition: service_started
+      tempo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    networks:
+      hospital-net:
+        ipv4_address: 172.20.0.10
+
+  loki:
+    image: grafana/loki:latest
+    container_name: hospital-loki
+    command: ["-config.file=/etc/loki/loki-config.yaml"]
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki-data:/loki
+      - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+    networks:
+      hospital-net:
+        ipv4_address: 172.20.0.11
+
+  mimir:
+    image: grafana/mimir:latest
+    container_name: hospital-mimir
+    command: ["-config.file=/etc/mimir/mimir-config.yaml"]
+    ports:
+      - "9009:9009"
+    volumes:
+      - mimir-data:/data
+      - ./mimir/mimir-config.yaml:/etc/mimir/mimir-config.yaml:ro
+    networks:
+      hospital-net:
+        ipv4_address: 172.20.0.12
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: hospital-tempo
+    command: ["-config.file=/etc/tempo/tempo-config.yaml"]
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - tempo-data:/var/tempo
+      - ./tempo/tempo-config.yaml:/etc/tempo/tempo-config.yaml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3200/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks:
+      hospital-net:
+        ipv4_address: 172.20.0.13
+
+  alloy:
+    image: grafana/alloy:latest
+    container_name: hospital-alloy
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - /etc/alloy/config.alloy
+    ports:
+      - "12345:12345"
+      - "1514:514/udp"
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - hospital-logs:/var/log/hospital
+      - zeek-logs:/var/log/zeek/current
+    depends_on:
+      loki:
+        condition: service_started
+      mimir:
+        condition: service_started
+      tempo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:12345/-/healthy || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks:
+      hospital-net:
+        ipv4_address: 172.20.0.14
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: hospital-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/localhost/2181'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks:
+      hospital-net:
+        ipv4_address: 172.20.0.19
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: hospital-kafka
+    ports:
+      - "9092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+    networks:
+      hospital-net:
+        ipv4_address: 172.20.0.20
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: hospital-kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: hospital
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    networks:
+      hospital-net:
+        ipv4_address: 172.20.0.21
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: hospital-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -p 1883 -t '$$SYS/#' -C 1 -W 3 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks:
+      hospital-net:
+        ipv4_address: 172.20.0.22
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: hospital-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      mimir:
+        condition: service_started
+      siem-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/-/healthy || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    networks:
+      hospital-net:
+        ipv4_address: 172.20.0.23
+
+  hospital-api:
+    build: ./hospital-api
+    container_name: hospital-api
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    volumes:
+      - hospital-logs:/var/log/hospital
+    depends_on:
+      kafka:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=3).read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks:
+      hospital-net:
+        ipv4_address: 172.20.0.30
+
+  siem-backend:
+    build: ./siem-backend
+    container_name: hospital-siem-backend
+    ports:
+      - "8000:8000"
+      - "9101:9101"
+      - "9102:9102"
+    env_file:
+      - .env
+    volumes:
+      - ./detection-rules:/app/detection-rules:ro
+      - siem-models:/app/ml/models
+    depends_on:
+      kafka:
+        condition: service_healthy
+      loki:
+        condition: service_started
+      mimir:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks:
+      hospital-net:
+        ipv4_address: 172.20.0.31
+
+  iot-simulator:
+    build: ./iot-simulator
+    container_name: hospital-iot-simulator
+    env_file:
+      - .env
+    volumes:
+      - hospital-logs:/var/log/hospital
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:9090/metrics', timeout=3).read()\""]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    networks:
+      hospital-net:
+        ipv4_address: 172.20.0.32
+
+  zeek:
+    image: zeek/zeek:latest
+    container_name: hospital-zeek
+    command: ["zeek", "-C", "-i", "eth0", "/usr/local/zeek/share/zeek/site/local.zeek"]
+    volumes:
+      - ./zeek/local.zeek:/usr/local/zeek/share/zeek/site/local.zeek:ro
+      - ./zeek/scripts:/usr/local/zeek/share/zeek/site/scripts:ro
+      - zeek-logs:/usr/local/zeek/logs/current
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      hospital-net:
+        ipv4_address: 172.20.0.33
+
+volumes:
+  loki-data:
+  mimir-data:
+  tempo-data:
+  grafana-data:
+  hospital-logs:
+  zeek-logs:
+  siem-models:
+
+networks:
+  hospital-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

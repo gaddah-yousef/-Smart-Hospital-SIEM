@@ -1,0 +1,160 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+loki.source.file "hospital_api_logs" {
+  targets = [
+    {
+      __path__  = "/var/log/hospital/hospital_security.log",
+      job       = "hospital-api",
+      env       = "production",
+      hospital  = "CHU-Rabat",
+    },
+  ]
+  forward_to = [loki.process.enrich_logs.receiver]
+}
+
+loki.source.syslog "linux_hosts" {
+  listener {
+    address  = "0.0.0.0:514"
+    protocol = "udp"
+    labels = {
+      job      = "syslog",
+      source   = "infrastructure",
+      env      = "production",
+      hospital = "CHU-Rabat",
+    }
+  }
+  forward_to = [loki.process.enrich_logs.receiver]
+}
+
+loki.source.file "zeek_logs" {
+  targets = [
+    {
+      __path__  = "/var/log/zeek/current/conn.log",
+      job       = "zeek",
+      type      = "network",
+      env       = "production",
+      hospital  = "CHU-Rabat",
+    },
+  ]
+  forward_to = [loki.process.enrich_logs.receiver]
+}
+
+loki.source.file "zeek_notices" {
+  targets = [
+    {
+      __path__  = "/var/log/zeek/current/notice.log",
+      job       = "zeek-notice",
+      type      = "network",
+      env       = "production",
+      hospital  = "CHU-Rabat",
+    },
+  ]
+  forward_to = [loki.process.enrich_logs.receiver]
+}
+
+loki.source.file "iot_gateway_logs" {
+  targets = [
+    {
+      __path__  = "/var/log/hospital/iot_gateway.log",
+      job       = "iot-gateway",
+      env       = "production",
+      hospital  = "CHU-Rabat",
+    },
+  ]
+  forward_to = [loki.process.enrich_logs.receiver]
+}
+
+loki.process "enrich_logs" {
+  stage.json {
+    expressions = {
+      event_type = "event_type",
+      source_ip  = "source_ip",
+      severity   = "severity",
+      proto      = "proto",
+      id_resp_p  = "id_resp_p",
+    }
+  }
+
+  stage.labels {
+    values = {
+      event_type = "",
+      severity   = "",
+      source_ip  = "",
+      proto      = "",
+      id_resp_p  = "",
+    }
+  }
+
+  stage.static_labels {
+    values = {
+      hospital = "CHU-Rabat",
+    }
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+prometheus.scrape "iot_metrics" {
+  targets = [
+    {
+      __address__ = "iot-simulator:9090",
+      job         = "iot-gateway",
+      hospital    = "CHU-Rabat",
+    },
+  ]
+  scrape_interval = "15s"
+  forward_to      = [prometheus.remote_write.mimir.receiver]
+}
+
+prometheus.scrape "siem_metrics" {
+  targets = [
+    {
+      __address__ = "siem-backend:9101",
+      job         = "siem-backend",
+      hospital    = "CHU-Rabat",
+    },
+    {
+      __address__ = "siem-backend:9102",
+      job         = "siem-stream",
+      hospital    = "CHU-Rabat",
+    },
+  ]
+  scrape_interval = "15s"
+  forward_to      = [prometheus.remote_write.mimir.receiver]
+}
+
+prometheus.remote_write "mimir" {
+  endpoint {
+    url = "http://mimir:9009/api/v1/push"
+  }
+}
+
+otelcol.receiver.otlp "hospital_traces" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+  output {
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}

@@ -1,0 +1,62 @@
+target: all
+multitenancy_enabled: false
+
+server:
+  http_listen_port: 9009
+  grpc_listen_port: 9095
+  log_level: info
+
+common:
+  storage:
+    backend: filesystem
+    filesystem:
+      dir: /data/blocks
+
+blocks_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/blocks
+  bucket_store:
+    sync_dir: /data/tsdb-sync
+  tsdb:
+    dir: /data/tsdb
+
+ruler_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/ruler
+
+compactor:
+  data_dir: /data/compactor
+  sharding_ring:
+    kvstore:
+      store: inmemory
+
+distributor:
+  ring:
+    kvstore:
+      store: inmemory
+
+ingester:
+  ring:
+    replication_factor: 1
+    kvstore:
+      store: inmemory
+
+store_gateway:
+  sharding_ring:
+    replication_factor: 1
+    kvstore:
+      store: inmemory
+
+ruler:
+  rule_path: /data/rules
+  alertmanager_url: http://grafana:3000/
+  ring:
+    kvstore:
+      store: inmemory
+
+limits:
+  ingestion_rate: 50000
+  ingestion_burst_size: 100000
+  max_global_series_per_user: 1000000

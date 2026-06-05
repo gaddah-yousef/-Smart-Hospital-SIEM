@@ -1,0 +1,65 @@
+# --- Secrets (NE JAMAIS COMMITTER) ---
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+*-credentials.json
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# --- Docker ---
+.docker/
+docker-compose.override.yml
+.runtime-ports.json
+
+# --- ML models (volumineux, regeneres a la volee) ---
+siem-backend/ml/models/*.pkl
+siem-backend/ml/models/*.h5
+siem-backend/ml/models/*.keras
+
+# --- IDE / Editeurs ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+logs/
+hospital-logs/
+zeek-logs/
+
+# --- Runtime ---
+.runtime-ports.json
+
+# --- LaTeX build ---
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.pdf
+!docs/**/*.pdf
+
+# --- Modeles entraines locaux ---
+*.pkl
+*.h5
+*.keras
+*.joblib

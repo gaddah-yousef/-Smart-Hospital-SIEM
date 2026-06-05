@@ -1,0 +1,11 @@
+rule: iot_critical_anomaly
+source: hospital.iot.*
+condition: ml_anomaly_score > 0.85 OR heart_rate > 180 OR spo2 < 80
+severity: EMERGENCY
+loki_label: iot_anomaly
+push_metric: hospital_siem_alert_total{rule="iot_anomaly"}
+grafana_alert: true
+telegram: true
+email: true
+pagerduty: optional
+mitre: T0858

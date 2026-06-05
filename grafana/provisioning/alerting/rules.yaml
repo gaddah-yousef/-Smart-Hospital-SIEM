@@ -1,0 +1,255 @@
+apiVersion: 1
+
+contactPoints:
+  # Un seul contact point qui contient DEUX recepteurs :
+  # chaque alerte envoyee a ce contact point declenche
+  # automatiquement Telegram ET un email.
+  - orgId: 1
+    name: telegram-hospital
+    receivers:
+      - uid: telegram-hospital
+        type: telegram
+        settings:
+          bottoken: "$__env{TELEGRAM_BOT_TOKEN}"
+          chatid: "$__env{TELEGRAM_CHAT_ID}"
+          message: '{{ template "default.message" . }}'
+      - uid: email-yousef
+        type: email
+        settings:
+          addresses: yousef.gaddah@enim.ac.ma
+          singleEmail: false
+          subject: '[Smart Hospital SIEM] {{ .CommonLabels.alertname }} - {{ .Status | toUpper }}'
+          message: |
+            ALERTE SIEM Smart Hospital
+            ==========================
+            Regle      : {{ .CommonLabels.alertname }}
+            Severite   : {{ .CommonLabels.severity }}
+            Statut     : {{ .Status }}
+            Declenchee : {{ .Alerts.Firing | len }} alerte(s)
+
+            {{ range .Alerts -}}
+            ---
+            Resume : {{ .Annotations.summary }}
+            Debut  : {{ .StartsAt }}
+            Labels : {{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+            {{ end }}
+
+            Voir Grafana : http://localhost:3000/alerting/list
+
+policies:
+  - orgId: 1
+    receiver: telegram-hospital
+    group_by:
+      - grafana_folder
+      - alertname
+
+groups:
+  - orgId: 1
+    name: Smart Hospital SIEM
+    folder: Smart Hospital SIEM
+    interval: 1m
+    rules:
+      - uid: brute-force-detected
+        title: Brute Force Detected
+        condition: C
+        for: 0s
+        labels:
+          severity: critical
+        annotations:
+          summary: More than five failed logins in one minute.
+        data:
+          - refId: A
+            datasourceUid: loki
+            relativeTimeRange:
+              from: 60
+              to: 0
+            model:
+              datasource:
+                type: loki
+                uid: loki
+              expr: count_over_time({job="hospital-api"} |= "LOGIN_FAILED" [1m])
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 60
+              to: 0
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 60
+              to: 0
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5]
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+      - uid: iot-critical-anomaly
+        title: IoT Critical Anomaly
+        condition: C
+        for: 0s
+        labels:
+          severity: critical
+        annotations:
+          summary: Emergency IoT anomaly event detected.
+        data:
+          - refId: A
+            datasourceUid: loki
+            relativeTimeRange:
+              from: 60
+              to: 0
+            model:
+              datasource:
+                type: loki
+                uid: loki
+              expr: count_over_time({job="iot-gateway"} |= "EMERGENCY" [1m])
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 60
+              to: 0
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 60
+              to: 0
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+      - uid: unauthorized-patient-access
+        title: Unauthorized Patient Access
+        condition: C
+        for: 0s
+        labels:
+          severity: high
+        annotations:
+          summary: Unauthorized patient record access detected.
+        data:
+          - refId: A
+            datasourceUid: loki
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              datasource:
+                type: loki
+                uid: loki
+              expr: count_over_time({job="hospital-api"} |= "UNAUTHORIZED_ACCESS" [5m])
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+      - uid: high-ml-anomaly-score
+        title: High ML Anomaly Score
+        condition: C
+        for: 2m
+        labels:
+          severity: high
+        annotations:
+          summary: Isolation Forest score exceeded 0.85.
+        data:
+          - refId: A
+            datasourceUid: mimir
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: mimir
+              expr: hospital_ml_isolation_score
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.85]
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C

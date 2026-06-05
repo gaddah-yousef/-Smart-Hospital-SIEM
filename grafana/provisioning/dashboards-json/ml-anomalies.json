@@ -1,0 +1,47 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "lineWidth": 2, "showPoints": "never"}, "max": 1, "min": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.7}, {"color": "red", "value": 0.85}]}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "mimir"}, "expr": "hospital_ml_isolation_score", "legendFormat": "{{source_ip}}", "refId": "A"}],
+      "title": "Isolation Forest score per source IP",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "lineWidth": 2, "showPoints": "never"}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+      "id": 2,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "mimir"}, "expr": "hospital_ml_lstm_reconstruction_error", "legendFormat": "{{device_id}} {{device_type}}", "refId": "A"}],
+      "title": "LSTM reconstruction error per IoT device",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "fieldConfig": {"defaults": {"custom": {"hideFrom": {"legend": false, "tooltip": false, "viz": false}, "scaleDistribution": {"type": "linear"}}, "max": 1, "min": 0}, "overrides": []},
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 16},
+      "id": 3,
+      "options": {"calculate": false, "cellGap": 1, "cellValues": {}, "color": {"exponent": 0.5, "fill": "dark-orange", "mode": "scheme", "reverse": false, "scale": "exponential", "scheme": "Spectral", "steps": 128}, "exemplars": {"color": "rgba(255,0,255,0.7)"}, "filterValues": {"le": 1e-9}, "legend": {"show": true}, "rowsFrame": {"layout": "auto"}, "tooltip": {"show": true, "yHistogram": false}, "yAxis": {"axisPlacement": "left", "reverse": false, "unit": "short"}},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "mimir"}, "expr": "hospital_ml_isolation_score", "legendFormat": "{{source_ip}}", "refId": "A"}],
+      "title": "Anomaly scores by hour of day",
+      "type": "heatmap"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["hospital", "ml", "anomalies"],
+  "templating": {"list": []},
+  "time": {"from": "now-24h", "to": "now"},
+  "timezone": "browser",
+  "title": "ML Anomaly Scores",
+  "uid": "ml-anomaly-scores",
+  "version": 1
+}

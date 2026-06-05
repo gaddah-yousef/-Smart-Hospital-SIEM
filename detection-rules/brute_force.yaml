@@ -1,0 +1,10 @@
+rule: brute_force_login
+source: hospital.auth.events
+condition: event_type == "LOGIN_FAILED" AND count(source_ip) >= 5 WITHIN 60s
+severity: HIGH
+loki_label: brute_force
+push_metric: hospital_siem_alert_total{rule="brute_force"}
+grafana_alert: true
+telegram: true
+email: false
+mitre: T1110

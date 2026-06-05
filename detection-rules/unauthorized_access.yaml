@@ -1,0 +1,10 @@
+rule: unauthorized_patient_access
+source: hospital.patient.access
+condition: event_type == "UNAUTHORIZED_ACCESS"
+severity: CRITICAL
+loki_label: unauthorized_access
+push_metric: hospital_siem_alert_total{rule="unauthorized_access"}
+grafana_alert: true
+telegram: true
+email: true
+mitre: T1078

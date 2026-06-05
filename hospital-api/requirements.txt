@@ -1,0 +1,8 @@
+Flask==3.0.3
+confluent-kafka==2.4.0
+python-json-logger==2.0.7
+opentelemetry-api==1.25.0
+opentelemetry-sdk==1.25.0
+opentelemetry-exporter-otlp==1.25.0
+opentelemetry-instrumentation-flask==0.46b0
+Werkzeug==3.0.3
